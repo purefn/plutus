@@ -36,6 +36,8 @@ library
     visibility: public
     hs-source-dirs: src/
     exposed-modules:
+    build-depends:
+    plutus-core -any
 
 test-suite uplc-eval-test
     import: lang
@@ -47,7 +49,7 @@ test-suite uplc-eval-test
         base >=4.9 && <5,
         tasty-golden -any,
         text -any,
-        plutus-conformance
+        plutus-conformance -any
 
 test-suite tplc-eval-test
     import: lang
