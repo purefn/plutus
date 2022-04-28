@@ -20,13 +20,12 @@ module Plutus.V1.Ledger.EvaluationContext
     ) where
 
 import Barbies
+import Plutus.ApiCommon
 import PlutusCore as Plutus (DefaultFun, DefaultUni, UnliftingMode (..), defaultCekCostModel)
 import PlutusCore.Evaluation.Machine.BuiltinCostModel
 import PlutusCore.Evaluation.Machine.CostModelInterface as Plutus
 import PlutusCore.Evaluation.Machine.MachineParameters as Plutus
 import UntypedPlutusCore.Evaluation.Machine.Cek as Plutus
-
-import Plutus.ApiCommon
 
 import Control.DeepSeq
 import Control.Lens
@@ -36,29 +35,7 @@ import Data.Set as Set
 import Data.Text qualified as Text
 import GHC.Exts (inline)
 import GHC.Generics
-
-type DefaultMachineParameters =
-    Plutus.MachineParameters CekMachineCosts CekValue DefaultUni DefaultFun
-
--- | An opaque type that contains all the static parameters that the evaluator needs to evaluate a
--- script.  This is so that they can be computed once and cached, rather than recomputed on every
--- evaluation.
---
--- There are two sets of parameters: one is with immediate unlifting and the other one is with
--- deferred unlifting. We have to keep both of them, because depending on the language version
--- either one has to be used or the other. We also compile them separately due to all the inlining
--- and optimization that need to happen for things to be efficient.
-data EvaluationContext = EvaluationContext
-    { machineParametersImmediate :: DefaultMachineParameters
-    , machineParametersDeferred  :: DefaultMachineParameters
-    }
-    deriving stock Generic
-    deriving anyclass NFData
-
-toMachineParameters :: ProtocolVersion -> EvaluationContext -> DefaultMachineParameters
-toMachineParameters pv = case unliftingModeIn pv of
-    UnliftingImmediate -> machineParametersImmediate
-    UnliftingDeferred  -> machineParametersDeferred
+import Plutus.ApiCommon
 
 {- Note [Inlining meanings of builtins]
 It's vitally important to inline the 'toBuiltinMeaning' method of a set of built-in functions as

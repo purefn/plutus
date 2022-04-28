@@ -14,7 +14,7 @@ import Data.ByteString.Short
 import Data.Foldable (fold, for_)
 import Data.Map qualified as Map
 import Data.Set qualified as Set
-import Plutus.ApiCommon
+import Plutus.ApiCommon as Common
 import Test.Tasty
 import Test.Tasty.HUnit
 
@@ -30,14 +30,20 @@ tests =
   testGroup
     "builtins"
     [ testCase "all builtins are available some time" $
-            let allPvBuiltins = fold $ Map.elems $ builtinsIntroducedIn
+            let allPvBuiltins = fold $ Map.elems builtinsIntroducedIn
                 allBuiltins = [(toEnum 0)..]
             in for_ allBuiltins $ \f -> assertBool (show f) (f `Set.member` allPvBuiltins)
-    , testCase "builtins aren't available before v5" $ assertBool "empty" (Set.null $ builtinsAvailableIn (ProtocolVersion 4 0))
-    , testCase "serializeData is only available in v6" $ do
-         assertBool "in v5 " $ not $ V1.isScriptWellFormed (ProtocolVersion 5 0) serialiseDataExScript
-         assertBool "not in v6" $ V1.isScriptWellFormed (ProtocolVersion 6 0) serialiseDataExScript
+    , testCase "builtins aren't available before l1" $ assertBool "empty" (Set.null $ builtinsAvailableIn (l 0) (p 5)) -- l0 invalid, p4 valid
+    , testCase "builtins aren't available before p5" $ assertBool "empty" (Set.null $ builtinsAvailableIn (l 1) (p 4)) -- l1 valid, p4 invalid
+    , testCase "builtins aren't available before l1 and p5" $ assertBool "empty" (Set.null $ builtinsAvailableIn (l 0) (p 4)) -- both invalid
+    , testCase "serializeData is only available in l2,p6 and after" $ do
+         assertBool "in l1,p5" $ not $ isScriptWellFormed (l 1) (p 5) serialiseDataExScript
+         assertBool "in l1,p6" $ not $ isScriptWellFormed (l 1) (p 6) serialiseDataExScript
+         assertBool "not in l2,p6" $ isScriptWellFormed (l 2) (p 6) serialiseDataExScript
     , testCase "cost model parameters " $
          -- v1 is missing some cost model parameters because new builtins are added in v2
          assertBool "v1 params is proper subset of v2 params" $ V1.costModelParamNames `Set.isProperSubsetOf` V2.costModelParamNames
     ]
+  where
+    l x = PLC.Version () x 0 0
+    p x = ProtocolVersion x 0
