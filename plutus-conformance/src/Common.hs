@@ -22,9 +22,8 @@ data TestContent =
     }
 
 mkTestContents :: [FilePath] -> [EvaluationResult UplcProg] -> [UplcProg] -> [TestContent]
-mkTestContents (hdF:tlF) (hdR:tlR) (hdI:tlI) =
-    MkTestContent hdF hdR hdI : mkTestContents tlF tlR tlI
-mkTestContents [] [] [] = []
+mkTestContents lFilepaths lRes lProgs =
+    [MkTestContent file res prog | file <- lFilepaths, res <- lRes, prog <- lProgs]
 
 type UplcProg = UPLC.Program Name DefaultUni DefaultFun ()
 
