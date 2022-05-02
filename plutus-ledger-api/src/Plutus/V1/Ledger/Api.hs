@@ -110,12 +110,15 @@ import Control.Monad.Except
 import Control.Monad.Writer
 import Data.Bifunctor
 import Data.ByteString.Lazy (fromStrict)
+import Data.ByteString.Lazy qualified as BSL
+import Data.ByteString.Lazy.Char8 qualified as BSL8
 import Data.ByteString.Short
 import Data.Either
 import Data.Maybe (isJust)
 import Data.SatInt
 import Data.Text (Text)
 import Data.Tuple
+import Flat (flat)
 import Plutus.V1.Ledger.Ada
 import Plutus.V1.Ledger.Address
 import Plutus.V1.Ledger.Bytes
@@ -143,6 +146,10 @@ import Prettyprinter
 import UntypedPlutusCore qualified as UPLC
 import UntypedPlutusCore.Check.Scope qualified as UPLC
 import UntypedPlutusCore.Evaluation.Machine.Cek qualified as UPLC
+
+import System.FilePath
+import System.IO.Temp
+import System.IO.Unsafe
 
 {- Note [Abstract types in the ledger API]
 We need to support old versions of the ledger API as we update the code that it depends on. You
@@ -198,9 +205,20 @@ mkTermToEvaluate :: (MonadError EvaluationError m) => SerializedScript -> [PLC.D
 mkTermToEvaluate bs args = do
     s@(Script (UPLC.Program _ v _)) <- liftEither $ first CodecError $ CBOR.deserialiseOrFail $ fromStrict $ fromShort bs
     unless (v == PLC.defaultVersion ()) $ throwError $ IncompatibleVersionError v
-    let appliedScript = unScript $ Scripts.applyArguments s args
-        -- add fake names to keep the api working on NamedDeBruijn
-        namedT = UPLC.termMapNames UPLC.fakeNameDeBruijn $ UPLC._progTerm appliedScript
+    let
+      writeScript s = unsafePerformIO $ do
+        dir <- createTempDirectory "/tmp/plutus" "scripts"
+        BSL.writeFile (dir </> "script.flat") . BSL.fromStrict . flat . void $ s
+        forM_ (zip [0..] args) $ \(i, a) -> do
+          BSL.writeFile (dir </> "arg" <.> show i <.> "flat") . BSL.fromStrict . flat $ a
+          BSL8.writeFile (dir </> "arg" <.> show i <.> "hshow") . BSL8.pack . show $ a
+        return s
+
+      appliedScript = writeScript $ unScript $ Scripts.applyArguments s args
+
+      -- add fake names to keep the api working on NamedDeBruijn
+      namedT = UPLC.termMapNames UPLC.fakeNameDeBruijn $ UPLC._progTerm appliedScript
+
     -- make sure that term is closed, i.e. well-scoped
     liftEither $ first DeBruijnError $ UPLC.checkScope namedT
     pure namedT
